@@ -29,6 +29,7 @@ REPO_ROOT = Path(__file__).resolve().parent
 DEFAULT_SERVER = "http://127.0.0.1:8188"
 DEFAULT_DATASET = "/content/data/dataset/dataset_comfyui"
 RUN_ROOT = REPO_ROOT / "ComfyUI" / "output" / "yue2_training"
+JOBS_ROOT = RUN_ROOT / "jobs"
 RUN_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}")
 
 AR_DEFAULTS = {
@@ -68,7 +69,7 @@ SMOKE_OVERRIDES = {
     "steps": 2,
     "save_every": 1,
     "accumulation": 1,
-    "sequence_tokens": 512,
+    "sequence_tokens": 2048,
     "allow_truncation": True,
     "schedule_steps": 3,
     "warmup_steps": 0,
@@ -91,6 +92,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--score-planning", choices=("off", "melody", "full"), default="off")
     parser.add_argument("--transcribe-scores", action="store_true")
     parser.add_argument("--train-acoustic", action="store_true", help="AR recipe: also train the NAR companion")
+    parser.add_argument("--resume", default="", help="Checkpoint relative to the run folder (e.g. resume.pt); config must match the original run")
     parser.add_argument("--nar-start", choices=("base", "community_v4"), default=None)
     parser.add_argument("--preview-style", default="instrumental acoustic guitar, warm folk")
     parser.add_argument("--preview-lyrics", default="")
@@ -233,7 +235,7 @@ def build_prompt(args: argparse.Namespace) -> dict:
             "inputs": {
                 "action": "train",
                 "output_name": args.run_name,
-                "resume": "",
+                "resume": args.resume,
                 "selected_step": 0,
                 "render_previews": args.render_previews,
                 "preview_style": args.preview_style,
@@ -248,11 +250,46 @@ def build_prompt(args: argparse.Namespace) -> dict:
     }
 
 
-def read_progress(run_name: str) -> str:
+def latest_job_event() -> str:
+    logs = sorted(JOBS_ROOT.glob("*.log"), key=lambda path: path.stat().st_mtime, reverse=True)
+    if not logs:
+        return ""
+    try:
+        lines = logs[0].read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return ""
+    for line in reversed(lines):
+        if not line.startswith("YUE2_EVENT "):
+            continue
+        try:
+            event = json.loads(line[len("YUE2_EVENT "):])
+        except json.JSONDecodeError:
+            continue
+        if event.get("message"):
+            return event["message"]
+        if event.get("type") == "progress":
+            return f"progress {event.get('step')}/{event.get('max_steps')}"
+    return ""
+
+
+def newest_job_start() -> float:
+    jobs = list(JOBS_ROOT.glob("*.json"))
+    return max((path.stat().st_mtime for path in jobs), default=0.0)
+
+
+def run_record(run_name: str) -> dict | None:
     path = RUN_ROOT / run_name / "run.json"
     if not path.is_file():
-        return "waiting for run.json"
-    record = json.loads(path.read_text(encoding="utf-8"))
+        return None
+    if path.stat().st_mtime < newest_job_start():
+        return None
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def read_progress(run_name: str) -> str:
+    record = run_record(run_name)
+    if record is None:
+        return latest_job_event() or "waiting for run.json"
     return f"status={record.get('status')} step={record.get('step')}/{record.get('config', {}).get('steps', '?')}"
 
 
@@ -260,9 +297,8 @@ def monitor_run(run_name: str, timeout: float) -> int:
     started = time.time()
     last = ""
     while True:
-        path = RUN_ROOT / run_name / "run.json"
-        if path.is_file():
-            record = json.loads(path.read_text(encoding="utf-8"))
+        record = run_record(run_name)
+        if record is not None:
             metrics = record.get("metrics") or []
             steps = record.get("config", {}).get("steps", "?")
             line = f"status={record.get('status')} step={record.get('step')}/{steps}"
@@ -273,9 +309,11 @@ def monitor_run(run_name: str, timeout: float) -> int:
                 last = line
             if record.get("status") in ("complete", "failed", "cancelled", "paused"):
                 return 0 if record["status"] == "complete" else 1
-        elif last != "missing":
-            print(f"No run.json yet for {run_name!r}", flush=True)
-            last = "missing"
+        else:
+            line = latest_job_event() or f"No run or worker log yet for {run_name!r}"
+            if line != last:
+                print(line, flush=True)
+                last = line
         if timeout and time.time() - started > timeout:
             return 1
         time.sleep(5)
@@ -332,4 +370,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except KeyboardInterrupt:
+        print()
+        raise SystemExit(130)

@@ -144,7 +144,9 @@ def wait_for_settle(folder: Path, seconds: float, logger: logging.Logger) -> Non
         return
     while True:
         newest = max(
-            (p.stat().st_mtime for p in folder.rglob("*") if p.is_file()), default=0.0
+            (p.stat().st_mtime for p in folder.rglob("*")
+             if p.is_file() and "jobs" not in p.relative_to(folder).parts),
+            default=0.0,
         )
         age = time.time() - newest
         if age >= seconds:
