@@ -12,6 +12,14 @@
 Nothing else. Not a monitor, not a companion — a problem solver, called in
 when needed.
 
+## Durable decisions & insights
+
+Read `DECISIONS.md` (repo root) at the start of any task involving training or
+tooling. It records only major, cross-session decisions and non-obvious insights
+— the things a fresh session must not re-litigate or rediscover. Keep it short:
+add an entry only when losing it would cost real work; it is not a log or a dump
+of routine findings. Routine, per-session state goes in `agent_notes/current.md`.
+
 ## The stack, so a fresh session isn't guessing
 
 ComfyUI + `filliptm/ComfyUI-FL-YuE2` (a custom node). **There is no training
