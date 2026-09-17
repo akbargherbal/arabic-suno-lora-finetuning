@@ -1,217 +1,187 @@
-"""Tests for prepare_dataset.py's pure functions and a real build."""
+"""Tests for prepare_dataset.py: pure helpers, corpus walk, and a real build."""
 
 from __future__ import annotations
 
-import csv
 import sys
 from pathlib import Path
+
+from conftest import DEFAULT_LYRICS, build_corpus, four_maqam_corpus, track, write_wav
 
 import prepare_dataset as pd
 
 # ---------------------------------------------------------------------------
-# clean_lyrics
+# Text helpers
 # ---------------------------------------------------------------------------
 
-RAW = (
-    "///***///\n"
-    "[Verse 1 | epic soaring vocals | heavy power chords]\n"
-    "آذَ نَتْنا بِبَينِها\n"
-    "[guitars surge — Ajam]\n"
-    "[Chorus]\n"
-    "ثُمَّ نَأَتْ"
-)
+def test_nfc_normalizes_nfd():
+    assert pd.nfc("e\u0301") == "é"
 
 
-def test_clean_lyrics_simplify():
-    out = pd.clean_lyrics(RAW, "simplify")
+def test_strip_control_tokens_removes_suno_header():
+    styles = (
+        '[Is_MAX_MODE: MAX](MAX)\n'
+        '[QUALITY: MAX](MAX)\n'
+        '[REALISM: MAX](MAX)\n'
+        '[START_ON: TRUE]\n'
+        'genre: "A"'
+    )
+    out = pd.strip_control_tokens(styles)
+    assert "MAX" not in out and "START_ON" not in out
+    assert 'genre: "A"' in out
+
+
+def test_parse_caption_fields_structured_order():
+    styles = (
+        'genre: "A"\nvocals: "B"\nproduction: "C"\n'
+        'instrumentation: "D"\nmood: "E"'
+    )
+    assert pd.parse_caption_fields(styles) == ["A", "B", "C", "D", "E"]
+
+
+def test_parse_caption_fields_unquoted_values():
+    assert pd.parse_caption_fields("genre: Rock\nvocals: Tenor") == ["Rock", "Tenor"]
+
+
+def test_parse_caption_fields_falls_back_to_plain_text():
+    assert pd.parse_caption_fields("just a plain description") == ["just a plain description"]
+
+
+def test_clean_caption_parsed_flattens_to_paragraph():
+    caption, source = pd.clean_caption('genre: "A"\nvocals: "B"')
+    assert caption == "A. B."
+    assert source == "parsed"
+
+
+def test_clean_caption_empty():
+    assert pd.clean_caption("") == ("", "empty")
+
+
+def test_normalize_lyrics_key_drops_divider_tags_and_whitespace():
+    raw = "///***///\n[Verse 1 | loud]\nكلمة   كلمة\n"
+    assert pd.normalize_lyrics_key(raw) == "كلمة كلمة"
+
+
+def test_canonical_section_label():
+    assert pd.canonical_section_label("Verse 1 | epic soaring vocals") == "Verse"
+    assert pd.canonical_section_label("Instrumental Build-up: guitars") == "Instrumental"
+    assert pd.canonical_section_label("orchestral strings swell") is None
+
+
+def test_clean_lyrics_simplifies_headers_and_drops_cues():
+    out = pd.clean_lyrics(DEFAULT_LYRICS)
     assert "///***///" not in out
-    assert "[Verse 1]" in out
-    assert "[Verse 1 |" not in out
-    assert "guitars surge" not in out
-    assert "[Chorus]" in out
-    assert "آذَ نَتْنا بِبَينِها" in out
-    assert "ثُمَّ نَأَتْ" in out
-
-
-def test_clean_lyrics_full_keeps_tags_but_drops_marker():
-    out = pd.clean_lyrics(RAW, "full")
-    assert "///***///" not in out
-    assert "[Verse 1 | epic soaring vocals | heavy power chords]" in out
-    assert "[guitars surge — Ajam]" in out
-
-
-def test_clean_lyrics_strip_removes_all_tags():
-    out = pd.clean_lyrics(RAW, "strip")
-    assert "[" not in out and "]" not in out
-    assert "آذَ نَتْنا بِبَينِها" in out
-
-
-def test_clean_lyrics_collapses_blank_runs():
-    assert pd.clean_lyrics("a\n\n\n\nb", "simplify") == "a\n\nb"
+    assert "[Verse]" in out and "[Chorus]" in out
+    assert "|" not in out and "power chords" not in out
+    assert "آذنتنا ببينها" in out
 
 
 def test_clean_lyrics_empty():
-    assert pd.clean_lyrics("", "simplify") == ""
+    assert pd.clean_lyrics("") == ""
+
+
+def test_classify_status():
+    assert pd.classify_status("downloaded") == "included"
+    assert pd.classify_status("skipped_existing") == "included"
+    assert pd.classify_status("failed") == "excluded"
+    assert pd.classify_status("something_else") == "unknown"
+
+
+def test_find_audio_is_nfc_tolerant(tmp_path):
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    (workspace / "e\u0301.wav").write_bytes(b"x")  # NFD on disk
+    assert pd.find_audio(workspace, "é.wav") is not None  # NFC lookup
 
 
 # ---------------------------------------------------------------------------
-# ascii_safe_slug
+# Corpus walk
 # ---------------------------------------------------------------------------
 
+def test_walk_corpus_retains_missing_and_reports_orphans(tmp_path):
+    root = tmp_path / "corpus"
+    build_corpus(root, [
+        track(clip_id="keep", filename="keep.wav"),
+        track(clip_id="gone", filename="gone.wav", present=False),
+    ])
+    write_wav(root / "hijaz" / "ws_a" / "orphan.wav")
 
-def test_ascii_safe_slug_strips_arabic():
-    # The collision that motivated poem_id: two unrelated Arabic titles collapse
-    # onto the same slug because all Arabic characters are stripped.
-    assert pd.ascii_safe_slug("01-الوداع-الطويل") == "01"
-    assert pd.ascii_safe_slug("01-عزة-الفارس") == "01"
+    report = pd.Report()
+    kept = pd.walk_corpus(root, report)
 
-
-def test_ascii_safe_slug_fallback_and_max_len():
-    assert pd.ascii_safe_slug("الوداع") == "track"
-    assert pd.ascii_safe_slug("a" * 100) == "a" * 40
-
-
-# ---------------------------------------------------------------------------
-# caption / header parsing
-# ---------------------------------------------------------------------------
+    assert [t.clip_id for t in kept] == ["keep"]
+    assert [m["clip_id"] for m in report.missing] == ["gone"]
+    assert [o["filename"] for o in report.orphans] == ["orphan.wav"]
 
 
-def test_extract_caption_maqam():
-    assert pd.extract_caption_maqam("... Maqam Hijaz ...") == "Hijaz"
-    assert pd.extract_caption_maqam("Maqam Nahawand") == "Nahawand"
-    assert pd.extract_caption_maqam("Maqam Rast") is None  # not one of the 4
-    assert pd.extract_caption_maqam("no maqam here") is None
-
-
-def test_extract_start_phrase_and_mood():
-    assert pd.extract_start_phrase('[START_ON: "آذنتنا"]') == "آذنتنا"
-    assert pd.extract_start_phrase("nothing") is None
-    assert pd.extract_mood('mood: "wistful"') == "wistful"
-    assert pd.extract_mood("nothing") is None
-
-
-# ---------------------------------------------------------------------------
-# split_train_val
-# ---------------------------------------------------------------------------
-
-
-def _tracks(spec):
-    """spec: list of (group_key, maqam, clip_id)."""
-    return [
-        pd.Track(
-            clip_id=c,
-            workspace="ws",
-            maqam=m,
-            caption_maqam=m,
-            original_title=g,
-            audio_path=Path(f"{c}.mp3"),
-            styles="",
-            lyrics="",
-            start_phrase=None,
-            mood=None,
-            group_key=g,
-        )
-        for g, m, c in spec
-    ]
-
-
-SPEC = [
-    ("hijaz::a", "Hijaz", "c1"),
-    ("hijaz::a", "Hijaz", "c2"),
-    ("hijaz::b", "Hijaz", "c3"),
-    ("hijaz::c", "Hijaz", "c4"),
-    ("kurd::d", "Kurd", "c5"),
-    ("kurd::e", "Kurd", "c6"),
-    ("kurd::f", "Kurd", "c7"),
-]
-
-
-def test_split_train_val_no_poem_leaks():
-    train, val = pd.split_train_val(_tracks(SPEC), 0.34, seed=13)
-    train_groups = {t.group_key for t in train}
-    val_groups = {t.group_key for t in val}
-    assert train_groups & val_groups == set()
-    assert val_groups  # non-empty
-    assert "hijaz" in {t.maqam.lower() for t in val}
-    assert "kurd" in {t.maqam.lower() for t in val}
-
-
-def test_split_train_val_deterministic():
-    a = pd.split_train_val(_tracks(SPEC), 0.34, seed=13)
-    b = pd.split_train_val(_tracks(SPEC), 0.34, seed=13)
-    assert [t.clip_id for t in a[0]] == [t.clip_id for t in b[0]]
-    assert [t.clip_id for t in a[1]] == [t.clip_id for t in b[1]]
-
-
-def test_cap_per_song():
-    tracks = _tracks(SPEC)
-    assert len(pd.cap_per_song(tracks, None)) == len(tracks)
-    capped = pd.cap_per_song(tracks, 1)
-    assert len(capped) == 6  # the hijaz::a pair collapses to one
-    assert len(pd.cap_per_song(tracks, 2)) == 7
-
-
-# ---------------------------------------------------------------------------
-# integration: build from a fixture corpus
-# ---------------------------------------------------------------------------
-
-
-def _run_prepare(corpus_root: Path, out_dir: Path, monkeypatch, *extra):
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "prepare_dataset.py",
-            "--dataset-root",
-            str(corpus_root),
-            "--out-dir",
-            str(out_dir),
-            *extra,
-        ],
+def _track(clip_id: str, maqam_key: str, lyrics: str) -> pd.Track:
+    return pd.Track(
+        clip_id=clip_id,
+        maqam_key=maqam_key,
+        maqam=maqam_key.title(),
+        workspace="ws",
+        original_title="T",
+        source_audio=Path(f"{clip_id}.wav"),
+        styles_raw="",
+        lyrics_raw=lyrics,
+        exclude_styles="",
+        created_at="",
+        status="downloaded",
     )
-    pd.main()
-    with (out_dir / "manifest.csv").open(encoding="utf-8") as f:
-        return list(csv.DictReader(f))
 
 
-def test_build_clean_corpus(corpus, tmp_path, monkeypatch):
+def test_duplicate_groups_are_per_maqam_and_per_lyrics():
+    a = _track("a", "hijaz", "one two")
+    b = _track("b", "hijaz", "one two")
+    other_maqam = _track("c", "kurd", "one two")
+    pd.assign_duplicate_groups([a, b, other_maqam])
+
+    assert a.duplicate_group_id == b.duplicate_group_id
+    assert a.duplicate_group_size == 2
+    assert other_maqam.duplicate_group_id != a.duplicate_group_id
+    assert other_maqam.duplicate_group_size == 1
+
+
+def test_write_comfyui_disambiguates_colliding_stems(tmp_path):
+    used: set[str] = set()
+    first = _track("dup", "hijaz", "x")
+    second = _track("dup", "kurd", "y")
+    _, stem_a = pd.write_comfyui(first, tmp_path, used, dry_run=True)
+    _, stem_b = pd.write_comfyui(second, tmp_path, used, dry_run=True)
+
+    assert stem_a == "dup"
+    assert stem_b == "dup_kurd"
+
+
+# ---------------------------------------------------------------------------
+# End-to-end build
+# ---------------------------------------------------------------------------
+
+def test_main_builds_neutral_and_comfyui_layouts(tmp_path, monkeypatch):
+    src = tmp_path / "src"
+    four_maqam_corpus(src)
     out = tmp_path / "dataset"
-    rows = _run_prepare(corpus("manifest_clean.json"), out, monkeypatch)
+    comfy = tmp_path / "dataset_comfyui"
+    monkeypatch.setattr(sys, "argv", [
+        "prepare_dataset.py", "--src", str(src),
+        "--out", str(out), "--comfyui-out", str(comfy),
+    ])
 
-    # 3 on-disk tracks (the below-rating entry has no file) across 2 poems.
-    assert len(rows) == 3
-    assert len({r["dest_audio"] for r in rows}) == 3
-    assert len({r["clip_id"] for r in rows}) == 3
+    assert pd.main() == 0
 
-    # Sidecars exist and the lyrics were cleaned.
-    for r in rows:
-        assert Path(r["dest_audio"]).exists()
-        assert Path(r["dest_style"]).exists()
-        lyrics = Path(r["dest_lyrics"]).read_text(encoding="utf-8")
-        assert "///***///" not in lyrics
-        assert "|" not in lyrics  # simplify collapsed the pipe tag
-        style = Path(r["dest_style"]).read_text(encoding="utf-8")
-        assert "Maqam Hijaz" in style
+    for maqam in ("ajam", "hijaz", "kurd", "nahawand"):
+        stem = f"{maqam}-0001"
+        assert (out / maqam / f"{stem}.wav").is_file()
+        assert (out / maqam / f"{stem}.caption.txt").read_text(encoding="utf-8").strip()
+        assert (out / maqam / f"{stem}.lyrics.txt").read_text(encoding="utf-8").strip()
+        assert (out / maqam / f"{stem}.meta.json").is_file()
 
+    assert (comfy / "hijaz-0001.wav").is_file()
+    assert (comfy / "hijaz-0001.caption.json").is_file()
+    assert (comfy / "hijaz-0001.song.txt").read_text(encoding="utf-8").strip()
 
-def test_build_colliding_slugs_get_unique_destinations(corpus, tmp_path, monkeypatch):
-    out = tmp_path / "dataset"
-    rows = _run_prepare(corpus("manifest_naming_collision.json"), out, monkeypatch)
-
-    assert len(rows) == 3
-    # Every destination is distinct even though all three slugs are "01".
-    assert len({r["dest_audio"] for r in rows}) == 3
-    train = [r for r in rows if r["split"] == "train"]
-    assert len(train) == 2
-    assert len({Path(r["dest_audio"]).name for r in train}) == 2
-    for r in rows:
-        assert Path(r["dest_audio"]).exists()
-
-
-def test_clean_flag_wipes_previous_build(corpus, tmp_path, monkeypatch):
-    out = tmp_path / "dataset"
-    _run_prepare(corpus("manifest_clean.json"), out, monkeypatch)
-    stale = out / "train" / "stale-does-not-belong.mp3"
-    stale.write_bytes(b"ID3stale")
-    _run_prepare(corpus("manifest_clean.json"), out, monkeypatch, "--clean")
-    assert not stale.exists()
+    for name in (
+        "orphan_audio.csv", "missing_audio.csv", "schema_deviations.csv",
+        "status_value_counts.csv", "duplicate_groups.csv",
+        "dataset_manifest.csv", "build_log.txt",
+    ):
+        assert (out / "_reports" / name).is_file()

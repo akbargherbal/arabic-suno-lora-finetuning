@@ -1,27 +1,26 @@
 #!/usr/bin/env python3
 """Mirror the high-stake run artifacts to GCS on a timer.
 
-The YuE2 trainer has no time-based save -- `--save-every` is in optimizer steps --
-so a Colab/VM interruption can lose GPU work. Run this in a second terminal next
-to training: it mirrors only the folders needed to resume or debug the run up to
-a GCS prefix with `gsutil rsync`.
+FL-YuE2 only checkpoints every `save_every` optimizer steps (there is no
+time-based save), so a Colab/VM interruption can lose GPU work. Run this in a
+second terminal next to training: it mirrors only the folders needed to resume
+or debug the run up to a GCS prefix with `gsutil rsync`.
 
-rsync is append/update-only here (no `-d`): nothing is ever deleted on the remote
-side. If a pass catches a checkpoint mid-write, the next pass re-uploads it once
-the local file stops changing, so a torn upload self-heals.
+rsync is append/update-only here (no `-d`): nothing is ever deleted on the
+remote side. If a pass catches a checkpoint mid-write, the next pass re-uploads
+it once the local file stops changing, so a torn upload self-heals.
 
 Every run gets its own subfolder -- `<base>/<run-name>/` -- under one generic
-root (`.../YuE2-3B_Finetuning/`), so a new run can never overwrite a previous
-one and the bucket root stays fixed. `--run-name` is required and a
+root (`.../YuE2-3B_Arabic_Suno_Finetuning/`), so a new run can never overwrite
+a previous one and the bucket root stays fixed. `--run-name` is required and a
 `run_manifest.json` is written at the run folder's root so it identifies
-itself. Non-run folders already under the root (`dataset/`, `track4_ab/`,
-`fine_tuning_ai_music_lora/`) are reserved.
+itself. `dataset/` already lives under the root and is reserved.
 
 Usage:
-    python backup_to_gcp.py --run-name maqamverse_calib_v1
-    python backup_to_gcp.py --run-name maqamverse_calib_v1 --interval-minutes 20
-    python backup_to_gcp.py --run-name maqamverse_calib_v1 --once
-    python backup_to_gcp.py --run-name maqamverse_calib_v1 --dry-run
+    python backup_to_gcp.py --run-name my_song_lora
+    python backup_to_gcp.py --run-name my_song_lora --interval-minutes 20
+    python backup_to_gcp.py --run-name my_song_lora --once
+    python backup_to_gcp.py --run-name my_song_lora --dry-run
 """
 
 from __future__ import annotations
@@ -44,23 +43,20 @@ DEFAULT_BASE = f"{BUCKET}/YuE2-3B_Arabic_Suno_Finetuning"
 RESERVED_SUBFOLDERS = {"dataset"}
 DEFAULT_LOG = Path("/content/logs/gcp_backup.log")
 
-CACHE_DIR = REPO_ROOT / "ComfyUI" / "custom_nodes" / "ComfyUI-YuE2-Trainer" / "cache"
+# FL-YuE2 output roots (its own code: yue2/training/service.py + nodes.py):
+#   adapters   = ComfyUI/models/loras/YuE2/<run>/step-NNNNNN.safetensors (+ -nar)
+#   run state  = ComfyUI/output/yue2_training/<run>/{run.json,resume.pt,previews}
+#   prep cache = ComfyUI/output/yue2_training/prepared (MERT feats + semantic
+#                tokens) and .../acoustic_targets (VAE targets)
+LORA_ROOT = REPO_ROOT / "ComfyUI" / "models" / "loras"
+RUN_ROOT = REPO_ROOT / "ComfyUI" / "output" / "yue2_training"
 
 # (source folder, remote subfolder, wait for writes to settle before syncing)
 TARGETS = [
-    (REPO_ROOT / "ComfyUI" / "models" / "loras", "loras", True),
+    (LORA_ROOT, "loras", True),
+    (RUN_ROOT, "runs", True),
     (Path("/content/logs"), "logs", False),
     (REPO_ROOT / "agent_notes", "agent_notes", False),
-    # Mothersuperior calibration (PLAN.md §5.3): joint.py writes head/lora
-    # checkpoints + train.log to {W}/<name> and the round-trip render to
-    # {W}/listen_real, where W=/workspace/tok/full. Skipped when absent.
-    (Path("/workspace/tok/full"), "head_calib", False),
-    # GPU prep for the calibration (PLAN.md §5.1): MERT features + VAE latents
-    # + prompt prefixes, ~25 min to regenerate. Skipped when absent.
-    (Path("/workspace/real/prep"), "prep", False),
-    # Stage-1 tokenize cache (VAE latents + semantic tokens). Losing it forces a
-    # full re-tokenize (KI-30); append/update-only, so steady-state is cheap.
-    (CACHE_DIR, "cache", False),
 ]
 DEFAULT_EXCLUDES = [r".*\.tmp$", r".*put_loras_here$", r".*put_checkpoints_here$"]
 
@@ -96,7 +92,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--include-cache",
         action="store_true",
-        help="Deprecated no-op: the tokenize cache is now always mirrored (KI-30).",
+        help="Deprecated no-op: the prep cache lives under the mirrored runs/ target.",
     )
     p.add_argument(
         "--settle-seconds",

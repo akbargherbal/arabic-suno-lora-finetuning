@@ -5,3 +5,10 @@ min_4stars_ai_music/
 *.safetensors
 ComfyUI/
 output/
+
+# Agent scratch + local tool caches (AGENTS.md)
+agent_notes/current.md
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.pyc
