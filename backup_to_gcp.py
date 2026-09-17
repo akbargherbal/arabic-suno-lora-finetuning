@@ -29,6 +29,7 @@ import argparse
 import datetime as dt
 import json
 import logging
+import os
 import shutil
 import subprocess
 import sys
@@ -36,10 +37,12 @@ import time
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent
-BUCKET = "gs://akbar-december-2024-backup"
-# One generic root for the whole project; each run gets a subfolder under it.
-DEFAULT_BASE = f"{BUCKET}/YuE2-3B_Arabic_Suno_Finetuning"
-# Non-run folders that already live under DEFAULT_BASE; never use as a run name.
+# The GCS base is supplied at runtime, like the API keys: the launching
+# notebook exports GCP_BACKUP_BASE, so no bucket- or account-specific value is
+# stored in this repo. Override per invocation with --base. Format:
+# gs://<bucket>/<project-prefix>.
+DEFAULT_BASE = os.environ.get("GCP_BACKUP_BASE", "")
+# Non-run folders that already live under the base; never use as a run name.
 RESERVED_SUBFOLDERS = {"dataset"}
 DEFAULT_LOG = Path("/content/logs/gcp_backup.log")
 
@@ -72,8 +75,10 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--base",
-        default=DEFAULT_BASE,
-        help=f"GCS root to mirror into (default: {DEFAULT_BASE}).",
+        default=None,
+        help="GCS root to mirror into (gs://<bucket>/<project-prefix>). Defaults "
+             "to $GCP_BACKUP_BASE, which the launching notebook exports; it is "
+             "required if that is unset.",
     )
     p.add_argument(
         "--interval-minutes",
@@ -254,22 +259,30 @@ def main() -> int:
         return 2
     args.gsutil = gsutil
 
+    args.base = (args.base or DEFAULT_BASE).rstrip("/")
+    if not args.base:
+        logger.error(
+            "no GCS base: pass --base or set GCP_BACKUP_BASE "
+            "(the launching notebook exports it)"
+        )
+        return 3
+
     if args.run_name in RESERVED_SUBFOLDERS:
         logger.error(
             "%r is a reserved non-run folder under %s; pick another run name.",
             args.run_name,
-            DEFAULT_BASE,
+            args.base,
         )
         return 3
 
-    prefix = f"{args.base.rstrip('/')}/{args.run_name}"
+    prefix = f"{args.base}/{args.run_name}"
 
     targets = list(TARGETS)
 
     logger.info(
         "backup run %r to %s/%s every %.0f min (once=%s, dry-run=%s)",
         args.run_name,
-        args.base.rstrip("/"),
+        args.base,
         args.run_name,
         args.interval_minutes,
         args.once,

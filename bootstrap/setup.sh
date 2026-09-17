@@ -4,17 +4,16 @@
 # Run this BACKGROUNDED while you do `./code tunnel` auth in the foreground,
 # so the auth wait and the install/download time overlap:
 #
-#   git clone https://github.com/akbargherbal/arabic-suno-lora-finetuning.git
-#   cd arabic-suno-lora-finetuning
+#   git clone <this repo's URL>            # the launching notebook supplies it
+#   cd <repo>
 #   bash bootstrap/setup.sh > /content/logs/setup.log 2>&1 &
-#   ../code tunnel
+#   /content/code tunnel
 #
 # Deliberately non-interactive — nothing here should prompt. HF_TOKEN is
 # staged into a plain file by the notebook cell BEFORE this script runs, since
 # `userdata` only exists inside the notebook kernel, not in a terminal shell.
-# GCP auth itself happens separately via `gcloud auth login` in that same cell.
-# GCP_DATASET_PATH falls back to this project's known prefix, so the dataset
-# job also works if the notebook cell did not export it.
+# GCP auth and the dataset's GCS location both come from that same cell: the
+# path arrives as GCP_DATASET_PATH. No bucket or path is hardcoded in this repo.
 #
 # Toolchain note: unlike yue2_lora_finetuning (a CLI trainer), this project
 # trains through ComfyUI + filliptm/ComfyUI-FL-YuE2 graph nodes. FL-YuE2 can
@@ -58,9 +57,11 @@ FLYUE2_COMMIT="80422124ef7a7b2132d4ae5da7cdfc7213a5c4f7"
 # build this run used is still identifiable after the fact.
 COMFY_REPO="https://github.com/comfyanonymous/ComfyUI.git"
 
-# `gsutil cp -r` nests the source folder under the destination, so this lands
-# at /content/data/dataset/{dataset,dataset_comfyui}/.
-DATASET_GCS="${GCP_DATASET_PATH:-gs://akbar-december-2024-backup/YuE2-3B_Arabic_Suno_Finetuning/dataset}"
+# The dataset's GCS location is supplied at runtime by the launching notebook
+# (exported into /root/.secrets.env); it is never hardcoded here. `gsutil cp -r`
+# nests the source folder under the destination, so this lands at
+# /content/data/dataset/{dataset,dataset_comfyui}/.
+DATASET_GCS="${GCP_DATASET_PATH:?GCP_DATASET_PATH must be set (the launching notebook exports it)}"
 
 echo "=== $(date) — arabic-suno bootstrap starting ==="
 

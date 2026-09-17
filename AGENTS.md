@@ -52,18 +52,19 @@ costs far less than compute, so **bias hard toward persisting** anything
 expensive to regenerate (adapters, run state, prep caches) and toward docs a
 context-less session can restore from.
 
-**Restore on a fresh VM:**
+**Restore on a fresh VM:** re-clone this repo, then:
 
 ```bash
-cd /content
-git clone https://github.com/akbargherbal/arabic-suno-lora-finetuning.git
-cd arabic-suno-lora-finetuning
+cd <repo>
 bash bootstrap/setup.sh     # idempotent: re-clones ComfyUI, re-downloads models + dataset
 ```
 
 `bootstrap/setup.sh` re-creates ComfyUI, every `ComfyUI/models/yue2/` weight,
-and the dataset. It does **not** restore trained adapters or run state — pull
-those from GCS: `<run>/loras/` → `ComfyUI/models/loras/`, `<run>/runs/` →
+and the dataset. The dataset's GCS path comes from `GCP_DATASET_PATH`, which
+the launching notebook exports — it is deliberately not stored in this repo.
+It does **not** restore trained adapters or run state — pull those from the
+run's GCS prefix (base in `GCP_BACKUP_BASE`, exported by the notebook):
+`<run>/loras/` → `ComfyUI/models/loras/`, `<run>/runs/` →
 `ComfyUI/output/yue2_training/`.
 
 ## Backup responsibility
@@ -75,7 +76,8 @@ those from GCS: `<run>/loras/` → `ComfyUI/models/loras/`, `<run>/runs/` →
   `TARGETS` covers it — if not, fix the script, don't work around it by hand.
 - Before the user starts a run, confirm the daemon is actually running
   (`pgrep -af backup_to_gcp.py`, or freshness of `/content/logs/gcp_backup.log`).
-  If it isn't, give the exact command — `--run-name` is required:
+  If it isn't, give the exact command — `--run-name` is required, and the GCS
+  base comes from `GCP_BACKUP_BASE`, which the launching notebook exports:
 
   ```bash
   cd /content/arabic-suno-lora-finetuning
@@ -83,10 +85,10 @@ those from GCS: `<run>/loras/` → `ComfyUI/models/loras/`, `<run>/runs/` →
     > /content/logs/gcp_backup_stdout.log 2>&1 & disown
   ```
 
-- "Is my progress backed up?" → compare GCS object timestamps under
-  `gs://akbar-december-2024-backup/YuE2-3B_Arabic_Suno_Finetuning/<run>/` with
-  the local timestamps and report the actual drift — don't assume the last
-  known-good state is still current.
+- "Is my progress backed up?" → compare GCS object timestamps under the run's
+  configured prefix (`GCP_BACKUP_BASE` / `--base`) with the local timestamps
+  and report the actual drift — don't assume the last known-good state is
+  still current.
 
 ## Repo docs & checks
 
