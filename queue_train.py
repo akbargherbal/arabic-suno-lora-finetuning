@@ -91,6 +91,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--align-lyrics", action="store_true")
     parser.add_argument("--score-planning", choices=("off", "melody", "full"), default="off")
     parser.add_argument("--transcribe-scores", action="store_true")
+    parser.add_argument("--prepare-only", action="store_true", help="Run Dataset Maker + Prepare Dataset only (no training)")
+    parser.add_argument("--cache-dir", default="prepared", help="Prepare cache subfolder under output/yue2_training")
     parser.add_argument("--train-acoustic", action="store_true", help="AR recipe: also train the NAR companion")
     parser.add_argument("--resume", default="", help="Checkpoint relative to the run folder (e.g. resume.pt); config must match the original run")
     parser.add_argument("--nar-start", choices=("base", "community_v4"), default=None)
@@ -225,7 +227,7 @@ def build_prompt(args: argparse.Namespace) -> dict:
                 "dataset": ["3", 0],
                 "assets": ["1", 0],
                 "align_lyrics": args.align_lyrics,
-                "cache_directory": "prepared",
+                "cache_directory": args.cache_dir,
                 "score_planning": args.score_planning,
                 "transcribe_missing_scores": args.transcribe_scores,
             },
@@ -247,6 +249,41 @@ def build_prompt(args: argparse.Namespace) -> dict:
                 "config": ["2", 0],
             },
         },
+    }
+
+
+def build_prepare_prompt(args: argparse.Namespace) -> dict:
+    return {
+        "1": {
+            "class_type": "FL_YuE2_TrainingModels",
+            "inputs": {
+                "tokenizer_head": "tokenizer_head_joint_v4.pt",
+                "regularizer": "minted_regularizer_pack.pt",
+                "download_missing": True,
+            },
+        },
+        "2": {
+            "class_type": "FL_YuE2_DatasetMaker",
+            "inputs": {
+                "audio_directory": args.dataset,
+                "trigger": args.trigger,
+                "default_style": "",
+                "validation_fraction": args.validation_fraction,
+                "seed": args.seed if args.seed is not None else 42,
+            },
+        },
+        "3": {
+            "class_type": "FL_YuE2_PrepareDataset",
+            "inputs": {
+                "dataset": ["2", 0],
+                "assets": ["1", 0],
+                "align_lyrics": args.align_lyrics,
+                "cache_directory": args.cache_dir,
+                "score_planning": args.score_planning,
+                "transcribe_missing_scores": args.transcribe_scores,
+            },
+        },
+        "4": {"class_type": "PreviewAny", "inputs": {"source": ["3", 0]}},
     }
 
 
@@ -344,7 +381,7 @@ def main() -> int:
         raise SystemExit(f"Invalid --run-name {args.run_name!r}: use 1-80 letters, digits, underscores or hyphens")
     if args.monitor:
         return monitor_run(args.run_name, args.timeout)
-    prompt = build_prompt(args)
+    prompt = build_prepare_prompt(args) if args.prepare_only else build_prompt(args)
     class_types = sorted({node["class_type"] for node in prompt.values()})
     info = {}
     for class_type in class_types:

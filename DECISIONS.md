@@ -44,3 +44,26 @@ is not a log: routine per-session state belongs in `agent_notes/current.md`.
 - Without this, `loras/` adapters still sync at checkpoints, but `runs/`
   (`run.json`, `resume.pt`, caches) only syncs once a run stops — losing resume
   ability if the VM dies mid-run. The daemon must be restarted to load the fix.
+
+## Recipe vs dataset: run the score pilot before the joint recipe
+
+- This dataset has **no `.abc.txt` scores by design**: `prepare_dataset.py`'s
+  docstring calls transcription "a decision gate, not a build step" and only
+  emits a pilot candidate list. `dataset_prep_spec.md` §6 requires a ~10–15
+  track SheetSage2 pilot (checking Hijaz's augmented-second and Kurd's
+  lowered-second) before committing to scored training; the pilot was never run.
+- The joint recipe is score-conditioned: `abc_dropout` is inert with
+  `score_planning=off`, and in direct mode the AR CE is already saturated
+  (base model predicts the codec tokens), so a direct-mode joint run mostly
+  trains the NAR branch and wastes its other half. Don't run joint without scores.
+  Observed on `arabic_joint_v1` (direct mode, 643 steps): ar_ce ~0.015 from step
+  1, nar_flow flat ~0.97, validation flat.
+- Legacy AR is the spec's fallback, but as-shipped it needs `cursor_weight=0`
+  (or `align_lyrics=true`): the default 0.08 requires per-song lyric cursors the
+  prepared data does not have (`trainer.py` raises "Missing lyric alignment").
+- Even to **reuse** cached scores, `transcribe_missing_scores` must stay on:
+  `prepare.py` raises if a track has no ABC and the sheetsage asset is absent,
+  before it looks for the cached score file. So the scored joint run needs
+  `--score-planning full --transcribe-scores`.
+- Chosen path: pilot first; if the interval check passes, full scored prepare,
+  then requeue the joint recipe under a new run name.

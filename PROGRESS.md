@@ -21,13 +21,22 @@ changes; keep it short. Not a log — *why* things are the way they are lives in
   backup). Fixed a too-small `sequence_tokens` inherited from
   `training_smoke.json` (see `DECISIONS.md`).
 
-## In flight — joint AR/NAR `arabic_joint_v1`
+## 2026-09-17 — Joint AR/NAR `arabic_joint_v1` stopped (recipe/data mismatch)
 
-- Joint recipe: rank 32, seq 24576, steps 3000, save_every 200, accumulation 1,
-  nar_start base, previews on (30 s).
-- Acoustic-target encode finished (267/267); training started, step 5/3000 at
-  ~12.6 s/step → **ETA ~10–11 h** on the L4, plus ~15 preview renders.
-- Interruption/resume: `python queue_train.py --recipe joint --preset full
-  --run-name arabic_joint_v1 --resume resume.pt`.
-- Next: first checkpoint at step 200; review loss/previews, then judge whether
-  3000 steps is the right budget.
+- Joint recipe run in **direct mode** (no ABC scores): rank 32, seq 24576,
+  steps 3000, nar_start base. Ran to step ~643, checkpoints 200/400/600.
+- Analysis: NAR flow (~97% of the loss) essentially flat (~0.96–0.99), AR CE
+  saturated from step 1 (~0.015), validation flat. The joint recipe's
+  score-conditioned half never ran because the dataset has no `.abc` files.
+  See `DECISIONS.md` for the root cause; stopped by decision, artifacts kept.
+- Tooling added: `plot_training.py`; `queue_train.py --prepare-only` /
+  `--cache-dir`.
+
+## Next — score pilot, then scored joint (path A)
+
+- 16-track pilot set already built at `/content/data/pilot16` (4 per maqam).
+- Run `queue_train.py --prepare-only --dataset /content/data/pilot16
+  --score-planning full --transcribe-scores --cache-dir pilot_scores`, inspect
+  Hijaz/Kurd intervals; if it passes, full scored prepare then joint
+  `arabic_joint_v2` with `--score-planning full --transcribe-scores`.
+- Full runbook and stop/requeue commands: `agent_notes/current.md`.
