@@ -1,0 +1,8 @@
+-r requirements.txt
+
+# Test + lint tooling. Run:
+#   pytest
+#   ruff check .
+#   ruff format --check .
+pytest==8.4.2
+ruff==0.16.7

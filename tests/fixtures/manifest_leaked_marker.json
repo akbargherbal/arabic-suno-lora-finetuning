@@ -1,0 +1,16 @@
+{
+  "maqam": "kurd",
+  "workspace": "ws_marker",
+  "tracks": [
+    {
+      "clip_id": "clip-marker-0001",
+      "original_title": "01-معلقتي",
+      "assigned_filename": "01-معلقتي.mp3",
+      "styles": "genre: \"Symphonic cinematic orchestral ballad, Maqam Kurd\"\nvocals: \"deep male vocals\"\nproduction: \"Audiophile recording\"\ninstrumentation: \"Distorted electric guitars\"",
+      "exclude_styles": "Oud, Qanun, Darbuka",
+      "lyrics": "///***///\n[Verse 1 | epic soaring vocals | heavy power chords]\nقِفا نَبكِ مِن ذِكرى حَبيبٍ وَمَنزِلِ\n[guitars surge — Kurd]\n[Chorus]\nبِسِقطِ اللِّوى بَينَ الدَّخولِ فَحَومَلِ",
+      "created_at": "2026-01-01T00:00:00Z",
+      "status": "completed"
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "maqam": "hijaz",
+  "workspace": "ws_clean",
+  "tracks": [
+    {
+      "clip_id": "clip-hijaz-0001",
+      "original_title": "01-الوداع",
+      "assigned_filename": "01-الوداع_SONG_A.mp3",
+      "styles": "[Is_MAX_MODE: MAX](MAX) [QUALITY: MAX](MAX) [REALISM: MAX](MAX)\n[START_ON: TRUE]\n[START_ON: \"آذنتنا ببينها\"]\n\ngenre: \"Symphonic cinematic orchestral ballad, Maqam Hijaz\"\nvocals: \"deep male vocals\"\nproduction: \"Audiophile recording\"\ninstrumentation: \"Distorted electric guitars\"",
+      "exclude_styles": "Oud, Qanun, Darbuka",
+      "lyrics": "///***///\n[Verse 1 | epic soaring vocals | heavy power chords]\nآذَ نَتْنا بِبَينِها\n[guitars surge — Hijaz]\n[Chorus]\nثُمَّ نَأَتْ",
+      "created_at": "2026-01-01T00:00:00Z",
+      "status": "completed"
+    },
+    {
+      "clip_id": "clip-hijaz-0002",
+      "original_title": "01-الوداع",
+      "assigned_filename": "01-الوداع_SONG_B.mp3",
+      "styles": "genre: \"Symphonic cinematic orchestral ballad, Maqam Hijaz\"\nvocals: \"deep male vocals\"\nproduction: \"Audiophile recording\"\ninstrumentation: \"Distorted electric guitars\"",
+      "exclude_styles": "Oud, Qanun, Darbuka",
+      "lyrics": "///***///\n[Verse 1]\nآذَ نَتْنا بِبَينِها",
+      "created_at": "2026-01-02T00:00:00Z",
+      "status": "completed"
+    },
+    {
+      "clip_id": "clip-hijaz-0003",
+      "original_title": "02-عزة-الفارس",
+      "assigned_filename": "02-عزة-الفارس.mp3",
+      "styles": "genre: \"Symphonic cinematic orchestral ballad, Maqam Hijaz\"\nvocals: \"deep male vocals\"\nproduction: \"Audiophile recording\"\ninstrumentation: \"Distorted electric guitars\"",
+      "exclude_styles": "Oud, Qanun, Darbuka",
+      "lyrics": "///***///\n[Intro]\nيا عزة الفارس",
+      "created_at": "2026-01-03T00:00:00Z",
+      "status": "completed"
+    },
+    {
+      "clip_id": "clip-hijaz-0004-below-rating",
+      "original_title": "03-حذفت-لأنها-ضعيفة",
+      "assigned_filename": "03-حذفت-لأنها-ضعيفة.mp3",
+      "styles": "genre: \"Symphonic cinematic orchestral ballad, Maqam Hijaz\"",
+      "exclude_styles": "Oud, Qanun, Darbuka",
+      "lyrics": "///***///\n[Verse 1]\nسطر محذوف",
+      "created_at": "2026-01-04T00:00:00Z",
+      "status": "deleted"
+    }
+  ]
+}
