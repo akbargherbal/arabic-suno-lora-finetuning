@@ -12,13 +12,15 @@
 Nothing else. Not a monitor, not a companion — a problem solver, called in
 when needed.
 
-## Durable decisions & insights
+## Durable decisions & progress
 
-Read `DECISIONS.md` (repo root) at the start of any task involving training or
-tooling. It records only major, cross-session decisions and non-obvious insights
-— the things a fresh session must not re-litigate or rediscover. Keep it short:
-add an entry only when losing it would cost real work; it is not a log or a dump
-of routine findings. Routine, per-session state goes in `agent_notes/current.md`.
+Read `DECISIONS.md` and `PROGRESS.md` (repo root) at the start of any task
+involving training or tooling. `DECISIONS.md` records major, cross-session
+decisions and non-obvious insights — the things a fresh session must not
+re-litigate or rediscover. `PROGRESS.md` records the milestone trail: runs and
+their outcomes, and what's next. Keep both short and add an entry only when
+losing it would cost real work; neither is a log or a dump of routine findings.
+Routine, per-session state goes in `agent_notes/current.md`.
 
 ## The stack, so a fresh session isn't guessing
 
