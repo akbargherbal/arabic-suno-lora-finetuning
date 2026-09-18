@@ -58,8 +58,8 @@ FLYUE2_COMMIT="80422124ef7a7b2132d4ae5da7cdfc7213a5c4f7"
 COMFY_REPO="https://github.com/comfyanonymous/ComfyUI.git"
 
 # The dataset's GCS location is supplied at runtime by the launching notebook
-# (exported into /root/.secrets.env); it is never hardcoded here. `gsutil cp -r`
-# nests the source folder under the destination, so this lands at
+# (exported into /root/.secrets.env); it is never hardcoded here. The download
+# rsyncs the source prefix into /content/data/dataset, landing as
 # /content/data/dataset/{dataset,dataset_comfyui}/.
 DATASET_GCS="${GCP_DATASET_PATH:?GCP_DATASET_PATH must be set (the launching notebook exports it)}"
 
@@ -90,26 +90,52 @@ job_comfyui() {
 }
 
 job_dataset() {
-  mkdir -p /content/data
-  gsutil -m cp -r "$DATASET_GCS" /content/data
+  local marker="/content/data/dataset/.bootstrap_complete"
+  if [ -f "$marker" ]; then
+    echo "dataset already downloaded (marker $marker); skipping"
+    return 0
+  fi
+  # rsync (no -d) transfers only missing/changed objects, so a re-run after a
+  # partial download resumes cheaply instead of re-pulling all 267 tracks.
+  mkdir -p /content/data/dataset
+  gsutil -m rsync -r "$DATASET_GCS" /content/data/dataset
+  touch "$marker"
 }
 
 job_yue2() {
+  if [ -f "$COMFY/models/yue2/YuE2-3B/model.safetensors" ]; then
+    echo "YuE2-3B already present in ComfyUI; skipping download"
+    return 0
+  fi
   hf download m-a-p/YuE2-3B --revision "$YUE2_REV" \
     --exclude "assets/*" --local-dir "$STAGING/models/yue2/YuE2-3B"
 }
 
 job_vae() {
+  if [ -f "$COMFY/models/yue2/YuE2-Vae/model.safetensors" ]; then
+    echo "YuE2-Vae already present in ComfyUI; skipping download"
+    return 0
+  fi
   hf download m-a-p/YuE2-Vae --revision "$VAE_REV" \
     --exclude "assets/*" --local-dir "$STAGING/models/yue2/YuE2-Vae"
 }
 
 job_mert() {
+  if [ -f "$COMFY/models/yue2/MERT-v2-FullSong/model.safetensors" ]; then
+    echo "MERT-v2-FullSong already present in ComfyUI; skipping download"
+    return 0
+  fi
   hf download m-a-p/MERT-v2-FullSong --revision "$MERT_REV" \
     --exclude "assets/*" --local-dir "$STAGING/models/yue2/MERT-v2-FullSong"
 }
 
 job_assets() {
+  local dst="$COMFY/models/yue2/training_assets"
+  if [ -f "$dst/tokenizer_head_joint_v4.pt" ] && [ -f "$dst/nar_lora_joint_v4.pt" ] \
+     && [ -f "$dst/minted_regularizer_pack.pt" ]; then
+    echo "training assets already present in ComfyUI; skipping download"
+    return 0
+  fi
   hf download Mothersuperior/yue2-mothersuperior-realaudio-tokenizer-v4 \
     --revision "$TOKENIZER_REV" \
     tokenizer_head_joint_v4.pt nar_lora_joint_v4.pt \

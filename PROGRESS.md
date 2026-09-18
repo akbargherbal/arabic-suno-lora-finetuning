@@ -78,3 +78,11 @@ changes; keep it short. Not a log — *why* things are the way they are lives in
 - `backup_to_gcp.py` default interval lowered 25 → 15 min.
 - Next: run the comparison matrix (base, 400, 800, 1200) and judge the
   checkpoints; the final 3000-step `arabic_joint_v2` adapter is still pending.
+
+## 2026-09-18 — Bootstrap skips already-present downloads
+
+- `bootstrap/setup.sh` no longer re-downloads on a same-VM re-run: the dataset is
+  gated by `/content/data/dataset/.bootstrap_complete` and transferred with
+  `gsutil rsync` (partial downloads resume), and each YuE2 weight/asset job skips
+  when its file already exists in `ComfyUI/models/yue2/`. Fresh VMs are unchanged
+  (nothing present, full download).

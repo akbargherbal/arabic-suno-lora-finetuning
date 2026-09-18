@@ -66,12 +66,15 @@ context-less session can restore from.
 
 ```bash
 cd <repo>
-bash bootstrap/setup.sh     # idempotent: re-clones ComfyUI, re-downloads models + dataset
+bash bootstrap/setup.sh     # idempotent: skips ComfyUI/models/dataset already present
 ```
 
 `bootstrap/setup.sh` re-creates ComfyUI, every `ComfyUI/models/yue2/` weight,
-and the dataset. The dataset's GCS path comes from `GCP_DATASET_PATH`, which
-the launching notebook exports — it is deliberately not stored in this repo.
+and the dataset — but only downloads what is missing. On a re-run it skips the
+dataset (completion marker), skips any weight already in
+`ComfyUI/models/yue2/`, and rsyncs only missing tracks after a partial download.
+The dataset's GCS path comes from `GCP_DATASET_PATH`, which the launching
+notebook exports — it is deliberately not stored in this repo.
 It does **not** restore trained adapters or run state — pull those from the
 run's GCS prefix (base in `GCP_BACKUP_BASE`, exported by the notebook):
 `<run>/loras/` → `ComfyUI/models/loras/`, `<run>/runs/` →
