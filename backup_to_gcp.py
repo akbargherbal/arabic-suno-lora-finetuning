@@ -58,6 +58,7 @@ RUN_ROOT = REPO_ROOT / "ComfyUI" / "output" / "yue2_training"
 TARGETS = [
     (LORA_ROOT, "loras", True),
     (RUN_ROOT, "runs", True),
+    (REPO_ROOT / "INFERENCE" / "outputs", "inference", True),
     (Path("/content/logs"), "logs", False),
     (REPO_ROOT / "agent_notes", "agent_notes", False),
 ]

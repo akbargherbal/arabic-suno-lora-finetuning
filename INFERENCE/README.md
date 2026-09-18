@@ -97,6 +97,44 @@ INFERENCE/outputs/arabic_joint_v2/
 Listen to `<clip>_base.wav` vs `<clip>_step-NNNNNN.wav` for the LoRA effect, and
 compare the four maqam folders for the maqam character.
 
+## 6. Back the outputs up to GCS
+
+`INFERENCE/outputs` is a `backup_to_gcp.py` target (mirrored to `inference/`
+inside the run prefix), so the inference notebook can stream results to GCS the
+same way training does. Start it before or while rendering:
+
+```bash
+cd /content/arabic-suno-lora-finetuning
+setsid nohup python backup_to_gcp.py --run-name inference_arabic_joint_v2 \
+  > /content/logs/gcp_backup_stdout.log 2>&1 & disown
+```
+
+That mirrors into `gs://.../YuE2-3B_Arabic_Suno_Finetuning/inference_arabic_joint_v2/`:
+
+```
+inference/   <- INFERENCE/outputs/  (the WAVs + matrix.json)
+loras/       <- the adapters that were tested
+logs/        <- /content/logs
+agent_notes/ <- agent_notes/
+```
+
+So the audio lands at
+`.../inference_arabic_joint_v2/inference/<Maqam>/<clip8>_<variant>.wav`.
+
+One-shot upload when the matrix is done:
+
+```bash
+python backup_to_gcp.py --run-name inference_arabic_joint_v2 --once
+```
+
+Notes:
+- If `GCP_BACKUP_BASE` isn't exported in this notebook, add
+  `--base gs://akbar-december-2024-backup/YuE2-3B_Arabic_Suno_Finetuning`.
+- WAVs are written continuously; the daemon waits `--settle-seconds` (default
+  60) before a pass so it never uploads a half-written file. Lower it (e.g.
+  `--settle-seconds 20`) for more frequent passes.
+- `rsync` is append/update-only — nothing is ever deleted in GCS.
+
 ## Notes
 
 - **Prompt cleaning:** the manifest's `styles` is the pre-clean Suno block
