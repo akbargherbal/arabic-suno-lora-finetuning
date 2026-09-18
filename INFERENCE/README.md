@@ -38,6 +38,7 @@ companion, and the script passes both.
 
 ```bash
 RUN=arabic_joint_v2
+mkdir -p ComfyUI/models/loras/YuE2/        # gsutil won't create the destination
 gsutil -m cp -r \
   "${GCP_BACKUP_BASE}/$RUN/loras/YuE2/$RUN" \
   ComfyUI/models/loras/YuE2/
@@ -70,11 +71,23 @@ python INFERENCE/run_inference_matrix.py \
   --duration 90
 ```
 
+To compare specific checkpoints (base + `step-000400`/`000800`/`001200`):
+
+```bash
+python INFERENCE/run_inference_matrix.py \
+  --manifest INFERENCE/workspace_manifest.json \
+  --lora-dir ComfyUI/models/loras/YuE2/arabic_joint_v2 \
+  --out INFERENCE/outputs/compare \
+  --compare 400,800,1200 \
+  --duration 90
+```
+
 Useful options:
 
 | flag | meaning |
 | --- | --- |
 | `--adapters step-000400,step-000800` | exactly these checkpoints (+ base) |
+| `--compare 400,800,1200` | base + these checkpoint steps (shorthand for `--adapters`; accepts `400` or `step-000400`) |
 | `--all-adapters` | base + every checkpoint found |
 | `--all-tracks` | include the A/B pairs, not just one track per maqam |
 | `--maqams Hijaz,Kurd` | subset of maqams |

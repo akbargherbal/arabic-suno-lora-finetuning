@@ -18,7 +18,7 @@ itself. `dataset/` already lives under the root and is reserved.
 
 Usage:
     python backup_to_gcp.py --run-name my_song_lora
-    python backup_to_gcp.py --run-name my_song_lora --interval-minutes 20
+    python backup_to_gcp.py --run-name my_song_lora --interval-minutes 15
     python backup_to_gcp.py --run-name my_song_lora --once
     python backup_to_gcp.py --run-name my_song_lora --dry-run
 """
@@ -84,8 +84,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--interval-minutes",
         type=float,
-        default=25.0,
-        help="Minutes between passes (default: 25)",
+        default=15.0,
+        help="Minutes between passes (default: 15)",
     )
     p.add_argument(
         "--once", action="store_true", help="Run one pass and exit (for cron)."

@@ -50,6 +50,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out", type=Path, default=REPO_ROOT / "INFERENCE" / "outputs")
     parser.add_argument("--adapters", default="", help="Comma list of checkpoint labels, e.g. step-000400,step-000800")
     parser.add_argument("--all-adapters", action="store_true", help="Use base plus every checkpoint found")
+    parser.add_argument("--compare", default="", help="Shorthand to compare base against checkpoint steps, e.g. 400,800,1200 (accepts step-000400 too; base is always included)")
     parser.add_argument("--maqams", default=DEFAULT_MAQAMS)
     parser.add_argument("--all-tracks", action="store_true", help="Include every track, not one per maqam")
     parser.add_argument("--planning", choices=("off", "melody", "full"), default="off")
@@ -117,9 +118,19 @@ def find_adapters(lora_dir: Path) -> dict[str, tuple[Path, Path | None]]:
     return found
 
 
+def checkpoint_label(token: str) -> str:
+    token = token.strip()
+    if token.isdigit():
+        return f"step-{int(token):06d}"
+    return token
+
+
 def load_variants(args: argparse.Namespace) -> list[tuple[str, list[Path] | None]]:
     available = find_adapters(args.lora_dir)
-    if args.adapters:
+    if args.compare:
+        labels = [checkpoint_label(token) for token in args.compare.split(",") if token.strip()]
+        labels = list(dict.fromkeys(label for label in labels if label != "base"))
+    elif args.adapters:
         labels = [label.strip() for label in args.adapters.split(",") if label.strip()]
     elif args.all_adapters:
         labels = sorted(available)
@@ -176,11 +187,12 @@ def main() -> int:
         for track in tracks:
             seed = args.seed + track["index"]
             started = time.time()
-            plan = runtime.make_plan(patched, track["style"], track["lyrics"], seed, args.planning, "", args.max_tokens)
-            latent, truncated, _ = runtime.render(
-                patched, plan, args.duration, args.temperature, args.top_p, args.top_k,
-                args.repetition_penalty, args.guidance, args.acoustic_steps)
-            audio = runtime.decode(vae, latent, args.tile_frames)
+            with torch.no_grad():
+                plan = runtime.make_plan(patched, track["style"], track["lyrics"], seed, args.planning, "", args.max_tokens)
+                latent, truncated, _ = runtime.render(
+                    patched, plan, args.duration, args.temperature, args.top_p, args.top_k,
+                    args.repetition_penalty, args.guidance, args.acoustic_steps)
+                audio = runtime.decode(vae, latent, args.tile_frames)
             path = out_root / track["maqam"] / f"{track['clip_id'][:8]}_{label}.wav"
             save_audio(audio, path)
             seconds = audio["waveform"].shape[-1] / audio["sample_rate"]

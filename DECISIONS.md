@@ -94,3 +94,13 @@ is not a log: routine per-session state belongs in `agent_notes/current.md`.
   slower than L4's BF16 tensor cores.
 - The T4 was fine for the prepare-only pilot transcription; this applies to the
   full scored prepare + joint training. Switch before starting.
+
+## Standalone FL-YuE2 runtime needs `torch.no_grad()`
+
+- FL-YuE2's nodes execute under ComfyUI's inference mode, which hides this, but
+  calling `yue2.runtime` directly (e.g. `INFERENCE/run_inference_matrix.py`)
+  without `torch.no_grad()` builds an autograd graph across every NAR ODE step.
+  3 of 32 steps hit 18.4 GB on an L4; the default 32 OOM at 22 GB. Always wrap
+  direct `make_plan`/`render`/`decode` calls in `torch.no_grad()`.
+- Symptom: `torch.OutOfMemoryError` inside `nar.py` (`nar_mlp`), even for the
+  `base` (no-LoRA) variant.

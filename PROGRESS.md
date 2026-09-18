@@ -63,3 +63,18 @@ changes; keep it short. Not a log — *why* things are the way they are lives in
   `python plot_training.py --run-name <run> --out-dir TRAINING_ANALYSIS/<run>`).
 - Next: let it run to 3000, then judge the final adapter/previews; Legacy AR
   remains the spec's fallback if it is not worth keeping.
+
+## 2026-09-18 — Inference matrix works; checkpoint comparison added
+
+- Fixed two blockers in `INFERENCE/`: README step 2 `gsutil cp` needed a
+  `mkdir -p` destination, and `run_inference_matrix.py` drove FL-YuE2's runtime
+  without `torch.no_grad()`, so autograd retained the NAR ODE graph and OOM'd the
+  L4 even on `base`. Wrapped `make_plan`/`render`/`decode` in `torch.no_grad()`;
+  verified `Hijaz` base + `step-000200` render on L4 (~6.9 GB peak, exit 0).
+- User auditioned checkpoints: the style is emerging (positive), but output
+  sometimes babbles / chews words and does not end cleanly. Not yet a verdict.
+- Added `--compare 400,800,1200` to render base plus selected checkpoint steps;
+  README documents it.
+- `backup_to_gcp.py` default interval lowered 25 → 15 min.
+- Next: run the comparison matrix (base, 400, 800, 1200) and judge the
+  checkpoints; the final 3000-step `arabic_joint_v2` adapter is still pending.
