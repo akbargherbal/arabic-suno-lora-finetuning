@@ -32,11 +32,26 @@ changes; keep it short. Not a log — *why* things are the way they are lives in
 - Tooling added: `plot_training.py`; `queue_train.py --prepare-only` /
   `--cache-dir`.
 
-## Next — score pilot, then scored joint (path A)
+## 2026-09-18 — Score pilot ran on T4; scores do not capture the maqams
 
-- 16-track pilot set already built at `/content/data/pilot16` (4 per maqam).
-- Run `queue_train.py --prepare-only --dataset /content/data/pilot16
-  --score-planning full --transcribe-scores --cache-dir pilot_scores`, inspect
-  Hijaz/Kurd intervals; if it passes, full scored prepare then joint
-  `arabic_joint_v2` with `--score-planning full --transcribe-scores`.
-- Full runbook and stop/requeue commands: `agent_notes/current.md`.
+- Fresh VM (T4); `/content` was wiped, so rebuilt the 16-track `/content/data/pilot16`
+  from the persisted GCS candidate CSV + `dataset_comfyui`.
+- Ran `queue_train.py --prepare-only --dataset /content/data/pilot16
+  --score-planning full --transcribe-scores --cache-dir pilot_scores`. Outcome:
+  `complete`, 16/16 tracks, ~8.2 min, no OOM, no repair warnings.
+- Decision-gate finding: all 16 ABCs are diatonic natural minor in both voices;
+  0/16 show a lowered 2nd (Kurd) and only 1/16 a major 3rd (Hijaz). The
+  augmented-second / lowered-second intervals did not survive. Spec §6.3 →
+  don't commit to the scored joint run.
+- Detail and by-ear verification files: `agent_notes/current.md`.
+
+## Next — scored joint `arabic_joint_v2` (user committed, 2026-09-18)
+
+- Despite the pilot gate saying the scores miss the maqam, the user chose to run
+  the scored joint recipe on the full 267-track dataset. Recorded in
+  `DECISIONS.md`; don't re-open.
+- Run: `queue_train.py --recipe joint --preset full --run-name arabic_joint_v2
+  --score-planning full --transcribe-scores --cache-dir arabic_joint_v2` (Prepare
+  transcribes all 267 scores, then joint training; rank 32, seq 24576).
+- T4 should fit (`arabic_joint_v1` peaked at 12.4 GB); if training OOMs, switch
+  to L4 and restore the scored cache from GCS. Exact runbook: `agent_notes/current.md`.

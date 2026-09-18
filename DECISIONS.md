@@ -67,3 +67,20 @@ is not a log: routine per-session state belongs in `agent_notes/current.md`.
   `--score-planning full --transcribe-scores`.
 - Chosen path: pilot first; if the interval check passes, full scored prepare,
   then requeue the joint recipe under a new run name.
+
+## User override: run the scored joint recipe anyway
+
+- The 16-track pilot (2026-09-18) showed the SheetSage2 ABCs do **not** carry the
+  maqam — all four maqams come out diatonic natural minor, 0/16 with a lowered
+  2nd, 1/16 with a major 3rd. By `dataset_prep_spec.md` §6.3 this is the "maqam
+  transcribes badly" branch, and the recommendation was Legacy AR (no score).
+- The user was told and chose to proceed with the **scored joint** recipe anyway
+  (`arabic_joint_v2`, `--score-planning full --transcribe-scores`). Do not
+  re-open this; treat the scores as a weak/again-to-be-validated conditioning
+  signal, not as maqam ground truth. Any future "the scores don't encode the
+  maqam" finding is already known.
+- Measured precedent for capacity: `arabic_joint_v1` (rank 32, seq 24576, direct
+  mode) peaked at **12.4 GB allocated** — fits a 15 GB T4 with ~2.6 GB headroom,
+  tighter once the ABC tokens lengthen the text prefix. Fallback if it OOMs:
+  switch to L4 and restore the scored prep cache from the run's GCS prefix
+  (`<run>/runs/` → `output/yue2_training/`).
