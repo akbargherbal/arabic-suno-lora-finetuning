@@ -53,5 +53,11 @@ changes; keep it short. Not a log — *why* things are the way they are lives in
 - Run: `queue_train.py --recipe joint --preset full --run-name arabic_joint_v2
   --score-planning full --transcribe-scores --cache-dir arabic_joint_v2` (Prepare
   transcribes all 267 scores, then joint training; rank 32, seq 24576).
-- T4 should fit (`arabic_joint_v1` peaked at 12.4 GB); if training OOMs, switch
-  to L4 and restore the scored cache from GCS. Exact runbook: `agent_notes/current.md`.
+- Hardware decision: **switch to L4 before starting; do not run this on the T4.**
+  The T4 has 15 GB and `arabic_joint_v1` peaked at 12.4 GB *without* scores; the
+  scored ABC prefix is longer, and the T4 has no native BF16 (emulated via FP32),
+  so it is both memory-marginal and several times slower. `/content` is wiped by
+  the switch either way and the full run does not reuse the pilot cache, so
+  switching now costs nothing.
+- Status: **not started** — waiting on the L4 switch. Bootstrap + queue commands
+  in `agent_notes/current.md`.

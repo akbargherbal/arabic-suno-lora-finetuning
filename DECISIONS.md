@@ -84,3 +84,13 @@ is not a log: routine per-session state belongs in `agent_notes/current.md`.
   tighter once the ABC tokens lengthen the text prefix. Fallback if it OOMs:
   switch to L4 and restore the scored prep cache from the run's GCS prefix
   (`<run>/runs/` → `output/yue2_training/`).
+
+## Hardware: run the scored joint recipe on L4, not the T4
+
+- Use an **L4** for `arabic_joint_v2`. The T4 (15 GB) is memory-marginal: v1
+  peaked at 12.4 GB *without* scores, and the scored ABC prefix is longer and
+  grows activation memory. The T4 also lacks native BF16 (PyTorch emulates it
+  on FP32 CUDA cores), making the 267-track prep and 3000 steps several times
+  slower than L4's BF16 tensor cores.
+- The T4 was fine for the prepare-only pilot transcription; this applies to the
+  full scored prepare + joint training. Switch before starting.
