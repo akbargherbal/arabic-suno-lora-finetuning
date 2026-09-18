@@ -86,3 +86,18 @@ changes; keep it short. Not a log — *why* things are the way they are lives in
   `gsutil rsync` (partial downloads resume), and each YuE2 weight/asset job skips
   when its file already exists in `ComfyUI/models/yue2/`. Fresh VMs are unchanged
   (nothing present, full download).
+
+## 2026-09-18 — `arabic_joint_v2` stopped at step 2400 (resumable)
+
+- User stopped early (planned 2600, went to bed sooner). Reached **step 2400/3000**;
+  600 steps (~2.7 h) remain. No errors, ~57 min per 200-step checkpoint.
+- State fully in GCS under `arabic_joint_v2/{loras,runs}`: adapters **200–2400**
+  (+ `-nar`), `resume.pt`, `run.json`, previews, and the prepared/acoustic caches
+  (upload verified 20:01–20:02 UTC).
+- Regenerated the curves and updated
+  `TRAINING_ANALYSIS/arabic_joint_v2/analysis.md` to the 2400 snapshot:
+  `nar_validation` 0.9629 → 0.9494 over 2200 steps (slow, monotonic),
+  `ar_validation` flat, `artist_validation` 1.0183 → 1.0054 — still the plateau
+  the pilot gate predicted.
+- Next: resume from `resume.pt` (commands in `agent_notes/current.md`), or accept
+  the 2400 adapter and judge it with the `INFERENCE/` matrix.
