@@ -100,6 +100,15 @@ run's GCS prefix (base in `GCP_BACKUP_BASE`, exported by the notebook):
   and report the actual drift — don't assume the last known-good state is
   still current.
 
+## GitHub pushes
+
+- Pushing needs auth that the user supplies, never the agent. Ask them to run
+  `bash bootstrap/github_auth.sh` in their terminal and paste a PAT at the hidden
+  prompt; it validates the token, runs `gh auth setup-git`, and prints the
+  authenticated account. After that, `git push` works for the rest of the
+  session. Never ask for the token in chat.
+- `/content` is ephemeral, so re-run it on every fresh VM.
+
 ## Repo docs & checks
 
 - Dataset build and independent validation: `prepare_dataset.py`,
