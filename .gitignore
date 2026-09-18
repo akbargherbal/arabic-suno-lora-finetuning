@@ -5,6 +5,7 @@ min_4stars_ai_music/
 *.safetensors
 ComfyUI/
 output/
+INFERENCE/outputs/
 
 # Agent scratch + local tool caches (AGENTS.md)
 agent_notes/current.md
