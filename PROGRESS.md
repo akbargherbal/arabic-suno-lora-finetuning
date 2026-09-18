@@ -45,19 +45,20 @@ changes; keep it short. Not a log — *why* things are the way they are lives in
   don't commit to the scored joint run.
 - Detail and by-ear verification files: `agent_notes/current.md`.
 
-## Next — scored joint `arabic_joint_v2` (user committed, 2026-09-18)
+## 2026-09-18 — scored joint `arabic_joint_v2` running on L4; metrics flat
 
 - Despite the pilot gate saying the scores miss the maqam, the user chose to run
-  the scored joint recipe on the full 267-track dataset. Recorded in
-  `DECISIONS.md`; don't re-open.
-- Run: `queue_train.py --recipe joint --preset full --run-name arabic_joint_v2
-  --score-planning full --transcribe-scores --cache-dir arabic_joint_v2` (Prepare
-  transcribes all 267 scores, then joint training; rank 32, seq 24576).
-- Hardware decision: **switch to L4 before starting; do not run this on the T4.**
-  The T4 has 15 GB and `arabic_joint_v1` peaked at 12.4 GB *without* scores; the
-  scored ABC prefix is longer, and the T4 has no native BF16 (emulated via FP32),
-  so it is both memory-marginal and several times slower. `/content` is wiped by
-  the switch either way and the full run does not reuse the pilot cache, so
-  switching now costs nothing.
-- Status: **not started** — waiting on the L4 switch. Bootstrap + queue commands
-  in `agent_notes/current.md`.
+  the scored joint recipe on the full 267-track dataset (recorded in
+  `DECISIONS.md`; not re-opened). Queued on L4 at 07:33: prepare transcribed all
+  267 scores (~34 min), acoustic targets encoded (~26 min), joint training began
+  08:36 (rank 32, seq 24576, 3000 steps, `nar_start=base`).
+- At step ~936/3000 (~16 s/step, ETA ~9 h): train loss flat ~1.0, `ar_ce`
+  saturated ~0.02, `ar_kl` ~0.1, `nar_flow` oscillating ~0.9–1.0 with no
+  downward trend. Validation at 200/400/600/800: `ar_validation` ~0.024 flat,
+  `nar_validation` 0.963 → 0.956 (very slow), `artist_validation` ~1.01 flat.
+- Same behaviour as `arabic_joint_v1` — the scored conditioning is not moving the
+  loss. Not stopping (user decision). Checkpoints 200–800 and their previews are
+  backed up to GCS. Curves: `plots/arabic_joint_v2/` (regenerate with
+  `python plot_training.py --run-name <run> --out-dir plots/<run>`).
+- Next: let it run to 3000, then judge the final adapter/previews; Legacy AR
+  remains the spec's fallback if it is not worth keeping.
