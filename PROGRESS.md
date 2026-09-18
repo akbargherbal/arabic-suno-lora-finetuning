@@ -58,7 +58,8 @@ changes; keep it short. Not a log — *why* things are the way they are lives in
   `nar_validation` 0.963 → 0.956 (very slow), `artist_validation` ~1.01 flat.
 - Same behaviour as `arabic_joint_v1` — the scored conditioning is not moving the
   loss. Not stopping (user decision). Checkpoints 200–800 and their previews are
-  backed up to GCS. Curves: `plots/arabic_joint_v2/` (regenerate with
-  `python plot_training.py --run-name <run> --out-dir plots/<run>`).
+  backed up to GCS. Curves + analysis: `TRAINING_ANALYSIS/arabic_joint_v2/`
+  (regenerate with
+  `python plot_training.py --run-name <run> --out-dir TRAINING_ANALYSIS/<run>`).
 - Next: let it run to 3000, then judge the final adapter/previews; Legacy AR
   remains the spec's fallback if it is not worth keeping.

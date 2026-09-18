@@ -9,9 +9,9 @@ gradient norm, learning rate and checkpoint validation. Writes a PNG.
     python plot_training.py --run-name arabic_joint_v1
 
 Pass `--out-dir` to also write one graph per metric (plus smoothed trend lines)
-into a folder, which is what gets committed under `plots/<run>/`:
+into a folder, which is what gets committed under `TRAINING_ANALYSIS/<run>/`:
 
-    python plot_training.py --run-name arabic_joint_v2 --out-dir plots/arabic_joint_v2
+    python plot_training.py --run-name arabic_joint_v2 --out-dir TRAINING_ANALYSIS/arabic_joint_v2
 """
 from __future__ import annotations
 
